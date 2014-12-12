@@ -108,6 +108,10 @@ class MongoStatementCache extends PDOStatementDecorator {
     return parent::bindValue($parameter, $value, $data_type);
   }
 
+  /*
+   * Execute a query and cache the results
+   * - FIXME only cache for SELECT statements...
+   */
   function execute($input_parameters=array()) {
     foreach ($input_parameters as $pkey => $pval) {
       $this->params[$pkey] = $pval;
@@ -155,6 +159,11 @@ class MongoStatementCache extends PDOStatementDecorator {
 
   function fetchColumn($column_number=null) {
     return $this->concreteStatement->fetchColumn($column_number=0);
+  }
+
+  function rowCount() {
+    $cachedCount = count($this->fetchResults);
+    return $cachedCount > 0 ? $cachedCount : parent::rowCount();
   }
 
   /*
