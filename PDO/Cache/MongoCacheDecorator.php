@@ -143,21 +143,34 @@ class MongoStatementCache extends PDOStatementDecorator {
    * Fetch one result
    */
   function fetch($fetch_style=\PDO::FETCH_BOTH, $cursor_orientation=\PDO::FETCH_ORI_NEXT, $cursor_offset=0) {
-    $this->ensureArgumentsSupported($fetch_style, $cursor_orientation, $cursor_offset);
+    if ($cursor_orientation !== false) {
+      if ($cursor_orientation != \PDO::FETCH_ORI_NEXT) {
+        throw new NotImplementedException("MongoStatementCache does not (yet) support cursor orientations other than PDO::FETCH_ORI_NEXT");
+      }
+    }
+    if ($cursor_offset != 0) {
+      throw new NotImplementedException("MongoStatementCache does not (yet) support cursor offsets other than 0");
+    }
 
-    return $this->fetchResults[$this->cursor++];
+    return $this->formatFetch($this->fetchResults[$this->cursor++], $fetch_style);
   }
 
   /*
    * Fetch all results from stored state
    */
   function fetchAll($fetch_style=\PDO::FETCH_BOTH, $fetch_argument=null, $ctor_args=array()) {
-    $this->ensureArgumentsSupported($fetch_style, $fetch_argument); // FIXME
+    if ($fetch_argument != null) {
+      throw new NotImplementedException("MongoStatementCache does not (yet) support supplied fetch arguments");
+    }
+    if (count($ctor_args) != 0) {
+      throw new NotImplementedException("MongoStatementCache does not (yet) support ctor args");
+    }
 
-    return $this->fetchResults;
+    return $this->formatFetch($this->fetchResults, $fetch_style);
   }
 
   function fetchColumn($column_number=null) {
+    // FIXME
     return $this->concreteStatement->fetchColumn($column_number=0);
   }
 
@@ -180,18 +193,49 @@ class MongoStatementCache extends PDOStatementDecorator {
     return $inserted;
   }
 
-  private function ensureArgumentsSupported($fetch_style, $cursor_orientation=false, $cursor_offset=0) {
-    if ($fetch_style != \PDO::FETCH_BOTH) {
-      throw new NotImplementedException("MongoCacheDecorator does not (yet) support fetch styles other than PDO::FETCH_BOTH");
+  private function formatFetch($results, $fetch_style) {
+    switch ($fetch_style) {
+      case \PDO::FETCH_BOTH:
+        return $results;
+      case \PDO::FETCH_ASSOC:
+        return $this->formatFetchAssoc($results);
+      case \PDO::FETCH_NUM:
+        return $this->formatFetchNum($results);
+      default:
+        throw new NotImplementedException("MongoStatementCache does not (yet) support this fetch style");
     }
-    if ($cursor_orientation !== false) {
-      if ($cursor_orientation != \PDO::FETCH_ORI_NEXT) {
-        throw new NotImplementedException("MongoCacheDecorator does not (yet) support cursor orientations other than PDO::FETCH_ORI_NEXT");
+  }
+
+  private function formatFetchAssoc($results) {
+    $formatted = array();
+    foreach ($results as $result) {
+      $index = 0;
+      foreach ($result as $key => $val) {
+        if ($index++ %2 == 0) { // names are even keys
+          array_push($formatted, array(
+            $key => $val
+          ));
+        }
       }
     }
-    if ($cursor_offset != 0) {
-      throw new NotImplementedException("MongoCacheDecorator does not (yet) support non-zero cursor offsets");
+
+    return $formatted;
+  }
+
+  private function formatFetchNum($results) {
+    $formatted = array();
+    foreach ($results as $result) { // results are currently PDO::FETCH_BOTH
+      $index = 0;
+      foreach ($result as $key => $val) {
+        if ($index++ %2 == 1) { // indeces are odd keys
+          array_push($formatted, array(
+            $key => $val
+          ));
+        }
+      }
     }
+
+    return $formatted;
   }
 }
 ?>
