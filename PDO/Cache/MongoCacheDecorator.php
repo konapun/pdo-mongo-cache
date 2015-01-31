@@ -152,7 +152,7 @@ class MongoStatementCache extends PDOStatementDecorator {
       throw new NotImplementedException("MongoStatementCache does not (yet) support cursor offsets other than 0");
     }
 
-    return $this->formatFetch($this->fetchResults[$this->cursor++], $fetch_style);
+    return count($this->fetchResults) > 0 ? $this->formatFetch($this->fetchResults[$this->cursor++], $fetch_style) : false;
   }
 
   /*
