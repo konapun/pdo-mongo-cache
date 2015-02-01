@@ -152,7 +152,8 @@ class MongoStatementCache extends PDOStatementDecorator {
       throw new NotImplementedException("MongoStatementCache does not (yet) support cursor offsets other than 0");
     }
 
-    return count($this->fetchResults) > 0 ? $this->formatFetch($this->fetchResults[$this->cursor++], $fetch_style) : false;
+    if ($this->cursor-1 > $this->fetchResults) return false;
+    return $this->formatFetch($this->fetchResults[$this->cursor++], $fetch_style);
   }
 
   /*
@@ -166,7 +167,11 @@ class MongoStatementCache extends PDOStatementDecorator {
       throw new NotImplementedException("MongoStatementCache does not (yet) support ctor args");
     }
 
-    return $this->formatFetch($this->fetchResults, $fetch_style);
+    $all = array();
+    while ($row = $this->fetch($fetch_style)) {
+      array_push($all, $row);
+    }
+    return $all;
   }
 
   function fetchColumn($column_number=null) {
@@ -193,45 +198,38 @@ class MongoStatementCache extends PDOStatementDecorator {
     return $inserted;
   }
 
-  private function formatFetch($results, $fetch_style) {
+  /*
+   * Format a single row
+   */
+  private function formatFetch($result, $fetch_style) {
     switch ($fetch_style) {
       case \PDO::FETCH_BOTH:
-        return $results;
+        return $result;
       case \PDO::FETCH_ASSOC:
-        return $this->formatFetchAssoc($results);
+        return $this->formatFetchAssoc($result);
       case \PDO::FETCH_NUM:
-        return $this->formatFetchNum($results);
+        return $this->formatFetchNum($result);
       default:
         throw new NotImplementedException("MongoStatementCache does not (yet) support this fetch style");
     }
   }
 
-  private function formatFetchAssoc($results) {
+  private function formatFetchAssoc($result) {
     $formatted = array();
-    foreach ($results as $result) {
-      $index = 0;
-      foreach ($result as $key => $val) {
-        if ($index++ %2 == 0) { // names are even keys
-          array_push($formatted, array(
-            $key => $val
-          ));
-        }
+    foreach ($result as $key => $val) {
+      if (!is_int($key)) {
+        $formatted[$key] = $val;
       }
     }
 
     return $formatted;
   }
 
-  private function formatFetchNum($results) {
+  private function formatFetchNum($result) {
     $formatted = array();
-    foreach ($results as $result) { // results are currently PDO::FETCH_BOTH
-      $index = 0;
-      foreach ($result as $key => $val) {
-        if ($index++ %2 == 1) { // indeces are odd keys
-          array_push($formatted, array(
-            $key => $val
-          ));
-        }
+    foreach ($result as $key => $val) {
+      if (is_int($key)) {
+        $formatted[$key] = $val;
       }
     }
 
